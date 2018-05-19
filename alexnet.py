@@ -50,7 +50,7 @@ def print_activations(t):
   print(t.op.name, ' ', t.get_shape().as_list())
 
 
-def inference(images):
+def inference(images, return_layers=False):
   """Build the AlexNet model.
 
   Args:
@@ -61,6 +61,8 @@ def inference(images):
     parameters: a list of Tensors corresponding to the weights and biases of the
         AlexNet model.
   """
+  layers = dict()
+
   parameters = []
   # conv1
   with tf.name_scope('conv1') as scope:
@@ -73,7 +75,7 @@ def inference(images):
     conv1 = tf.nn.relu(bias, name=scope)
     print_activations(conv1)
     parameters += [kernel, biases]
-
+    layers["conv1"] = conv1
   # lrn1
  # with tf.name_scope('lrn1') as scope:
   #  lrn1 = tf.nn.local_response_normalization(conv1,
@@ -89,6 +91,7 @@ def inference(images):
                          padding='VALID',
                          name='pool1')
   print_activations(pool1)
+  layers["pool1"] = pool1
 
   # conv2
   with tf.name_scope('conv2') as scope:
@@ -101,7 +104,7 @@ def inference(images):
     conv2 = tf.nn.relu(bias, name=scope)
     parameters += [kernel, biases]
   print_activations(conv2)
-
+  layers["conv2"] = conv2
   # lrn2
  # with tf.name_scope('lrn2') as scope:
  #   lrn2 = tf.nn.local_response_normalization(conv2,
@@ -117,6 +120,7 @@ def inference(images):
                          padding='VALID',
                          name='pool2')
   print_activations(pool2)
+  layers["pool2"] = pool2
 
   # conv3
   with tf.name_scope('conv3') as scope:
@@ -130,6 +134,7 @@ def inference(images):
     conv3 = tf.nn.relu(bias, name=scope)
     parameters += [kernel, biases]
     print_activations(conv3)
+  layers["conv3"] = conv3
 
   # conv4
   with tf.name_scope('conv4') as scope:
@@ -143,6 +148,7 @@ def inference(images):
     conv4 = tf.nn.relu(bias, name=scope)
     parameters += [kernel, biases]
     print_activations(conv4)
+  layers["conv4"]  = conv4
 
   # conv5
   with tf.name_scope('conv5') as scope:
@@ -156,6 +162,7 @@ def inference(images):
     conv5 = tf.nn.relu(bias, name=scope)
     parameters += [kernel, biases]
     print_activations(conv5)
+  layers["conv5"] = conv5
 
   # pool5
   pool5 = tf.nn.max_pool(conv5,
@@ -164,15 +171,21 @@ def inference(images):
                          padding='VALID',
                          name='pool5')
   print_activations(pool5)
+  layers["pool5"] = pool5
 
   # dense1
   dense1 = tf.layers.dense(inputs=pool5, units=4096, activation=tf.nn.relu)
+  layers["dense1"] = dense1
 
   # dense2
   dense2 = tf.layers.dense(inputs=dense1, units=4096, activation=tf.nn.relu)
+  layers["dense2"] = dense2
   
   # dense3
   dense3 = tf.layers.dense(inputs=dense2, units=1000, activation=tf.nn.relu)
+  layers["dense3"] = dense3
+  if return_layers:
+  	return dense3, parameters, layers
   return dense3, parameters
 
 
@@ -232,7 +245,8 @@ def run_benchmark():
 
     # Build a Graph that computes the logits predictions from the
     # inference model.
-    dense3, parameters = inference(images)
+    # dense3, parameters = inference(images)
+    dense3, parameters, layers = inference(images, True)
 
     # Build an initialization operation.
     init = tf.global_variables_initializer()
@@ -247,10 +261,27 @@ def run_benchmark():
     # Run the forward benchmark.
     time_tensorflow_run(sess, dense3, "Forward")
 
+    time_tensorflow_run(sess, layers["conv5"], "5th layer feature map - Forward")
+
     # Add a simple objective so we can calculate the backward pass.
     objective = tf.nn.l2_loss(dense3)
     # Compute the gradient with respect to all the parameters.
     grad = tf.gradients(objective, parameters)
+
+    # this is not forward-backward time. tf.gradient only computes gradient wrt trainable variables
+    # to actucally do back propagation, try this:
+    optimizer = tf.train.AdamOptimizer(learning_rate=1e-4)
+
+    grad = optimizer.compute_gradients(objective)
+    bp_op = optimizer.apply_gradients(grad)
+
+	# or if gradients themselve is not of interest
+    bp_op = optimizer.mimimize(objective)
+
+    time_tensorflow_run(sess, bp_op, "Forward-backward")
+    
+
+
     # Run the backward benchmark.
     time_tensorflow_run(sess, grad, "Forward-backward")
 
