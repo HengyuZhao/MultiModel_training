@@ -247,6 +247,21 @@ def run_benchmark():
     # inference model.
     # dense3, parameters = inference(images)
     dense3, parameters, layers = inference(images, True)
+    
+    # Add a simple objective so we can calculate the backward pass.
+    objective = tf.nn.l2_loss(dense3)
+    # Compute the gradient with respect to all the parameters.
+    grad = tf.gradients(objective, parameters)
+
+    # this is not forward-backward time. tf.gradient only computes gradient wrt trainable variables
+    # to actucally do back propagation, try this:
+    optimizer = tf.train.AdamOptimizer(learning_rate=1e-4)
+
+    grad = optimizer.compute_gradients(objective)
+    bp_op = optimizer.apply_gradients(grad)
+
+  # or if gradients themselve is not of interest
+    bp_op = optimizer.minimize(objective)
 
     # Build an initialization operation.
     init = tf.global_variables_initializer()
@@ -262,21 +277,6 @@ def run_benchmark():
     time_tensorflow_run(sess, dense3, "Forward")
 
     time_tensorflow_run(sess, layers["conv5"], "5th layer feature map - Forward")
-
-    # Add a simple objective so we can calculate the backward pass.
-    objective = tf.nn.l2_loss(dense3)
-    # Compute the gradient with respect to all the parameters.
-    grad = tf.gradients(objective, parameters)
-
-    # this is not forward-backward time. tf.gradient only computes gradient wrt trainable variables
-    # to actucally do back propagation, try this:
-    optimizer = tf.train.AdamOptimizer(learning_rate=1e-4)
-
-    grad = optimizer.compute_gradients(objective)
-    bp_op = optimizer.apply_gradients(grad)
-
-	# or if gradients themselve is not of interest
-    bp_op = optimizer.mimimize(objective)
 
     time_tensorflow_run(sess, bp_op, "Forward-backward")
     
