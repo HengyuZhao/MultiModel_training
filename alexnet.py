@@ -189,7 +189,17 @@ def inference(images, return_layers=False):
   return dense3, parameters
 
 
-def time_tensorflow_run(session, target, info_string):
+def image_smys(layers):
+  smy_writer = tf.summary.FileWriter("tensorboard_log", graph=tf.get_default_graph())
+  saver = tf.train.Saver()
+  by_channels = tf.unstack(layers["conv5"], axis=3)
+  for idx, c in enumerate(by_channels):
+    print(tf.expand_dims(c, axis=-1))
+    tf.summary.image("conv5_channel_" + str(idx), tf.expand_dims(c, axis=-1))
+  return tf.summary.merge_all(), smy_writer, saver
+
+
+def time_tensorflow_run(session, target, info_string, smy=None, writer=None, saver=None):
   """Run the computation to obtain the target tensor and print timing stats.
 
   Args:
@@ -200,6 +210,9 @@ def time_tensorflow_run(session, target, info_string):
   Returns:
     None
   """
+  if smy is not None:
+    assert writer is not None, "a writer must be provided to log images"
+    assert saver is not None, "a saver must be provided to log images"
   num_steps_burn_in = 10
   total_duration = 0.0
   total_duration_squared = 0.0
@@ -207,7 +220,12 @@ def time_tensorflow_run(session, target, info_string):
     start_time = time.time()
     options = tf.RunOptions(trace_level=tf.RunOptions.FULL_TRACE)
     run_metadata = tf.RunMetadata()
-    _ = session.run(target,options=options,run_metadata=run_metadata)
+    if smy is None:
+      _ = session.run(target,options=options,run_metadata=run_metadata)
+    else:
+      _, feature_map = session.run([target, smy],options=options,run_metadata=run_metadata)
+      writer.add_summary(feature_map)
+      saver.save(session, "tensorboard_log/alexnet.ckpt")
     fetched_timeline = timeline.Timeline(run_metadata.step_stats)
     chrome_trace = fetched_timeline.generate_chrome_trace_format()
    # with open('/home/hzhao28/PIM/alexnet.json', 'w') as f:
@@ -248,6 +266,8 @@ def run_benchmark():
     # dense3, parameters = inference(images)
     dense3, parameters, layers = inference(images, True)
     
+    feature_maps = image_smys(layers)
+
     # Add a simple objective so we can calculate the backward pass.
     objective = tf.nn.l2_loss(dense3)
     # Compute the gradient with respect to all the parameters.
@@ -274,11 +294,11 @@ def run_benchmark():
     sess.run(init)
    # print(sess.run(dense3))
     # Run the forward benchmark.
-    time_tensorflow_run(sess, dense3, "Forward")
+    time_tensorflow_run(sess, dense3, "Forward", *feature_maps)
 
-    time_tensorflow_run(sess, layers["conv5"], "5th layer feature map - Forward")
+    time_tensorflow_run(sess, layers["conv5"], "5th layer feature map - Forward", image_smy)
 
-    time_tensorflow_run(sess, bp_op, "Forward-backward")
+    time_tensorflow_run(sess, bp_op, "Forward-backward", image_smy)
     
 
 
