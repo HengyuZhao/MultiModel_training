@@ -296,9 +296,9 @@ def run_benchmark():
     # Run the forward benchmark.
     time_tensorflow_run(sess, dense3, "Forward", *feature_maps)
 
-    time_tensorflow_run(sess, layers["conv5"], "5th layer feature map - Forward", image_smy)
+    time_tensorflow_run(sess, layers["conv5"], "5th layer feature map - Forward", image_smys)
 
-    time_tensorflow_run(sess, bp_op, "Forward-backward", image_smy)
+    time_tensorflow_run(sess, bp_op, "Forward-backward", image_smys)
     
 
 
@@ -322,7 +322,7 @@ if __name__ == '__main__':
   parser.add_argument(
       '--num_batches',
       type=int,
-      default=1000,
+      default=10,
       help='Number of batches to run.'
   )
   FLAGS, unparsed = parser.parse_known_args()
