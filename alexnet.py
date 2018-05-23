@@ -308,8 +308,6 @@ def run_benchmark():
 
     time_tensorflow_run(sess, bp_op, "Forward-backward", *feature_maps)
     
-
-
     # Run the backward benchmark.
     time_tensorflow_run(sess, grad, "Forward-backward")
 
@@ -330,7 +328,7 @@ if __name__ == '__main__':
   parser.add_argument(
       '--num_batches',
       type=int,
-      default=1000,
+      default=10,
       help='Number of batches to run.'
   )
   FLAGS, unparsed = parser.parse_known_args()
