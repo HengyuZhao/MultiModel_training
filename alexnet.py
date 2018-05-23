@@ -38,7 +38,8 @@ from datetime import datetime
 import math
 import sys
 import time
-
+from PIL import Image
+import numpy as np
 from six.moves import xrange  # pylint: disable=redefined-builtin
 import tensorflow as tf
 from tensorflow.python.client import timeline
@@ -255,11 +256,18 @@ def run_benchmark():
     # Note that our padding definition is slightly different the cuda-convnet.
     # In order to force the model to start with the same activations sizes,
     # we add 3 to the image_size and employ VALID padding above.
-    images = tf.Variable(tf.random_normal([FLAGS.batch_size,
-                                           image_size,
-                                           image_size, 3],
-                                          dtype=tf.float32,
-                                          stddev=1e-1))
+    # images = tf.Variable(tf.random_normal([FLAGS.batch_size,
+    #                                        image_size,
+    #                                        image_size, 3],
+    #                                       dtype=tf.float32,
+    #                                       stddev=1e-1))
+
+    image = Image.open("Picture1.png").resize((image_size, image_size))
+    image_rgb = Image.new("RGB", image.size, (255, 255, 255))
+    image_rgb.paste(image, mask=image.split()[3])
+    image_rgb = np.asarray(image_rgb, dtype=np.float32)
+    images = np.repeat(np.reshape(image_rgb, [1, image_size, image_size, 3]), FLAGS.batch_size, axis=0)
+    
 
     # Build a Graph that computes the logits predictions from the
     # inference model.
@@ -296,12 +304,10 @@ def run_benchmark():
     # Run the forward benchmark.
     time_tensorflow_run(sess, dense3, "Forward", *feature_maps)
 
-    time_tensorflow_run(sess, layers["conv5"], "5th layer feature map - Forward", image_smys)
+    time_tensorflow_run(sess, layers["conv5"], "5th layer feature map - Forward", *feature_maps)
 
-    time_tensorflow_run(sess, bp_op, "Forward-backward", image_smys)
+    time_tensorflow_run(sess, bp_op, "Forward-backward", *feature_maps)
     
-
-
     # Run the backward benchmark.
     time_tensorflow_run(sess, grad, "Forward-backward")
 
